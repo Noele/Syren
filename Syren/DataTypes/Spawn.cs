@@ -2,10 +2,10 @@
 
 public class Spawn
 {
-    public string pokemonName = "";
-    public readonly string channelId;
-    public Spawn(string channel_id)
+    public string PokemonName = "";
+    public readonly string ChannelId;
+    public Spawn(string channelId)
     {
-        channelId = channel_id;
+        ChannelId = channelId;
     }
 }

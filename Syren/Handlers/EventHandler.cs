@@ -23,8 +23,8 @@ public class EventHandler
         if (message.Author.IsBot) return;
         var Context = new SocketCommandContext(_client, message as SocketUserMessage);
         
-        var channel = Context.Guild.GetChannel(Convert.ToUInt64(_spawn.channelId)) as ISocketMessageChannel;
-        if (string.IsNullOrEmpty(_spawn.pokemonName))
+        var channel = Context.Guild.GetChannel(Convert.ToUInt64(_spawn.ChannelId)) as ISocketMessageChannel;
+        if (string.IsNullOrEmpty(_spawn.PokemonName))
         {
             var randomNumber = new Random().Next(0, 10);
             if (randomNumber == 5)
@@ -34,20 +34,21 @@ public class EventHandler
                 if(pokemonJson == null) { throw new Exception("Failed to load pokemon.json!!!"); }
                 
                 var randomPokemon = pokemonJson.Pokemon[new Random().Next(pokemonJson.Pokemon.Length)];
-                _spawn.pokemonName = randomPokemon;
-                using(var fs = File.OpenRead($"Data/Pokemon/Images/{randomPokemon}.png"))
+                while (randomPokemon == "Ditto")
                 {
-                    await channel.SendFileAsync(filename:"pokemon.png", stream:fs, text: "Who's That Pokémon?");
+                    randomPokemon = pokemonJson.Pokemon[new Random().Next(pokemonJson.Pokemon.Length)];;
                 }
-                
+                _spawn.PokemonName = randomPokemon;
 
+                await using var fs = File.OpenRead($"Data/Pokemon/Images/{randomPokemon}.png");
+                await channel.SendFileAsync(filename:"pokemon.png", stream:fs, text: "Who's That Pokémon?");
             }
         }
         else
         {
-            if (message.Content.ToLower() == _spawn.pokemonName.ToLower())
+            if (string.Equals(message.Content, _spawn.PokemonName, StringComparison.CurrentCultureIgnoreCase))
             {
-                await Context.Channel.SendMessageAsync($"Correct! {_spawn.pokemonName} was added to your Pokédex.");
+                await Context.Channel.SendMessageAsync($"Correct! {_spawn.PokemonName} was added to your Pokédex.");
                 var text = await File.ReadAllTextAsync("Data/Pokemon/trainers.json");
                 var pokemonJson = JsonConvert.DeserializeObject<TrainerJson.TrainerJsonRoot>(text);
                 var added = false;
@@ -56,10 +57,29 @@ public class EventHandler
                 {
                     if (trainer.UserId == message.Author.Id.ToString())
                     {
-                        pokemonJson.Trainers[i].Info.CapturedPokemon.Add(_spawn.pokemonName);
-                        added = true;
-                    }
+                        if (pokemonJson.Trainers[i].Info.CapturedPokemon.Contains(_spawn.PokemonName))
+                        {
+                            added = true;
+                            var randomNumber = new Random().Next(0, 50);
+                            if (randomNumber == 40)
+                            {
+                                await Context.Channel.SendMessageAsync($"Oh ? ... {_spawn.PokemonName} was actually a Ditto ! Ditto has been added to your pokédex !");
+                                pokemonJson.Trainers[i].Info.CapturedPokemon.Add("Ditto");
+                            }
+                        }
+                        else
+                        {
+                            added = true;
+                            pokemonJson.Trainers[i].Info.CapturedPokemon.Add(_spawn.PokemonName);
+                        }
+                        
+                        if (new Random().Next(0, 8192) == 6969)
+                        {
+                            pokemonJson.Trainers[i].Info.CapturedPokemon.Add($"Shiny-{_spawn.PokemonName}");
+                            await Context.Channel.SendMessageAsync($"Oh ? ... {_spawn.PokemonName} was actually a Shiny ! Shiny-{_spawn.PokemonName} has been added to your pokédex !");
+                        }
 
+                    }
                     i++;
                 }
                 
@@ -68,7 +88,7 @@ public class EventHandler
                     var newInfo = new TrainerJson.Info()
                     {
                         Name = message.Author.Username,
-                        CapturedPokemon = new List<string> {_spawn.pokemonName}
+                        CapturedPokemon = new List<string> {_spawn.PokemonName}
                     };
                     var newTrainer = new TrainerJson.Trainer()
                     {
@@ -80,7 +100,7 @@ public class EventHandler
            
                 var stringOfNewData = JsonConvert.SerializeObject(pokemonJson);
                 await File.WriteAllTextAsync("Data/Pokemon/trainers.json", stringOfNewData);
-                _spawn.pokemonName = "";
+                _spawn.PokemonName = "";
             }
         }
     }

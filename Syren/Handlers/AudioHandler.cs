@@ -36,8 +36,6 @@ public class AudioHandler
         }
 
         await args.Player.PlayAsync(lavaTrack);
-        await args.Player.TextChannel.SendMessageAsync(
-            $"{args.Reason}: {args.Track.Title}\nNow playing: {lavaTrack.Title}");
     }
     
     private async Task OnTrackException(TrackExceptionEventArgs arg) {

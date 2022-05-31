@@ -2,30 +2,31 @@
 
 namespace Syren.Syren.DataTypes;
 
-public class TrainerJson
+public static class TrainerJson
 {
     
-    public partial class TrainerJsonRoot
+    public class TrainerJsonRoot
     {
         [JsonProperty("trainers")]
-        public List<Trainer> Trainers { get; set; }
+        public List<Trainer> Trainers { get; set; } = null!;
     }
 
-    public partial class Trainer
+    public class Trainer
     {
         [JsonProperty("user_id")]
-        public string UserId { get; set; }
+        public string UserId { get; set; } = null!;
 
         [JsonProperty("info")]
-        public Info Info { get; set; }
+        public Info Info { get; set; } = null!;
     }
 
-    public partial class Info
+    public class Info
     {
         [JsonProperty("name")]
-        public string Name { get; set; }
+        public string Name { get; set; } = null!;
 
         [JsonProperty("captured_pokemon")]
-        public List<string> CapturedPokemon { get; set; }
+        public List<string> CapturedPokemon { get; set; } = null!;
     }
+    
 }
