@@ -2,18 +2,25 @@
 using System.Text;
 using Discord;
 using Discord.Commands;
+using SpotifyAPI.Web.Http;
+using Syren.Syren.Events;
 using Victoria;
 using Victoria.Enums;
 using Victoria.Responses.Search;
+using static Syren.Syren.DataTypes.Spotify;
 
 namespace Syren.Syren.Commands;
 
 public class Music : ModuleBase<SocketCommandContext> {
     private readonly LavaNode _lavaNode;
-	
-    public Music(LavaNode lavaNode)
-        => _lavaNode = lavaNode;
-		
+    private readonly SyrenSpotifyClient _syrenSpotifyClient;
+
+    public Music(LavaNode lavaNode, SyrenSpotifyClient syrenSpotifyClient)
+    {
+        _lavaNode = lavaNode;
+        _syrenSpotifyClient = syrenSpotifyClient;
+    }
+
     [Command("Join")]
     public async Task JoinAsync() {	
         if (_lavaNode.HasPlayer(Context.Guild)) {
@@ -52,6 +59,28 @@ public class Music : ModuleBase<SocketCommandContext> {
         await ReplyAsync("Shuffled.");
     }
 
+    [Command("Leave")]
+    public async Task LeaveAsync() {
+        if (!_lavaNode.TryGetPlayer(Context.Guild, out var player)) {
+            await ReplyAsync("I'm not connected to any voice channels!");
+            return;
+        }
+
+        var voiceChannel = (Context.User as IVoiceState)?.VoiceChannel ?? player.VoiceChannel;
+        if (voiceChannel == null) {
+            await ReplyAsync("Not sure which voice channel to disconnect from.");
+            return;
+        }
+
+        try {
+            await _lavaNode.LeaveAsync(voiceChannel);
+            await ReplyAsync($"I've left {voiceChannel.Name}!");
+        }
+        catch (Exception exception) {
+            await ReplyAsync(exception.Message);
+        }
+    }
+    
     [Command("Playlist"), Alias("list", "q", "queue")]
     public async Task PlaylistAsync([Remainder, Optional] string pageQuery)
     {
@@ -82,7 +111,7 @@ public class Music : ModuleBase<SocketCommandContext> {
         }.Build());
     }
 
-    [Command("Play")]
+    [Command("Play", RunMode = RunMode.Async)]
     public async Task PlayAsync([Remainder, Optional] string searchQuery) {
         if (string.IsNullOrWhiteSpace(searchQuery)) {
             await ReplyAsync("Please provide search terms.");
@@ -110,7 +139,44 @@ public class Music : ModuleBase<SocketCommandContext> {
                 await ReplyAsync(exception.Message);
             }
         }
-        
+
+        if (searchQuery.Contains("open.spotify.com/playlist/"))
+        {
+            var response = _syrenSpotifyClient.GetPlaylist(searchQuery);
+            if (response.Count == 0)
+            {
+                await ReplyAsync($"No tracks found for {searchQuery}");
+            }
+            
+            if (shuffle)
+            {
+                response = Toolbox.Shuffle(response) as List<string>;
+            }
+            
+            foreach (var track in response)
+            {
+                await PlayTrackAsync(track, false, false);
+            }
+            await ReplyAsync($"Enqueued {response.Count} songs.");
+        }
+
+        else if (searchQuery.Contains("open.spotify.com/track/"))
+        {
+            var response = _syrenSpotifyClient.GetTrack(searchQuery);
+            if(response == null)
+            {
+                await ReplyAsync($"Could not find the track {searchQuery}");
+            }
+            await PlayTrackAsync(response, true, false);
+        }
+        else
+        {
+            await PlayTrackAsync(searchQuery, true, shuffle);
+        }
+    }
+
+    private async Task PlayTrackAsync(string searchQuery, bool shouldOutput, bool shuffle)
+    {
         var searchResponse = await _lavaNode.SearchAsync(searchQuery.StartsWith("https") ? SearchType.Direct : SearchType.YouTube, searchQuery);
         
         if (searchResponse.Status is SearchStatus.LoadFailed or SearchStatus.NoMatches) {
@@ -130,14 +196,16 @@ public class Music : ModuleBase<SocketCommandContext> {
             {
                 player.Queue.Enqueue(searchResponse.Tracks);
 
+
             }
-            await ReplyAsync($"Enqueued {searchResponse.Tracks.Count} songs.");
+            if(shouldOutput)
+                await ReplyAsync($"Enqueued {searchResponse.Tracks.Count} songs.");
         }
         else {
             var track = searchResponse.Tracks.FirstOrDefault();
             player.Queue.Enqueue(track);
-
-            await ReplyAsync($"Enqueued {track?.Title}");
+            if(shouldOutput)
+                await ReplyAsync($"Enqueued {track?.Title}");
         }
 
         if (player.PlayerState is PlayerState.Playing or PlayerState.Paused) {

@@ -8,6 +8,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Syren.Syren.DataTypes;
 using Syren.Syren.Events;
 using Victoria;
+using Spotify = Syren.Syren.DataTypes.Spotify;
 
 namespace Syren.Syren
 {
@@ -22,7 +23,8 @@ namespace Syren.Syren
         private CommandService _commands;
         private IServiceProvider _services;
         private LavaNode _lavaNode;
-        public async Task SetSail(string token, string prefix, string channelId)
+        private SyrenSpotifyClient _syrenSpotify;
+        public async Task SetSail(string token, string prefix, string channelId, string spotifyToken)
         {
             _prefix = prefix;
             _token = token;
@@ -39,7 +41,8 @@ namespace Syren.Syren
                 GatewayIntents = GatewayIntents.All
             };
 
-
+            _syrenSpotify = new SyrenSpotifyClient(spotifyToken);
+            _syrenSpotify.Init();
             _client = new DiscordSocketClient(config); 
             _commands = new CommandService();
             _spawn = new Spawn(channelId);
@@ -49,6 +52,7 @@ namespace Syren.Syren
                 .AddSingleton(_commands)     
                 .AddSingleton(_lavaNode)
                 .AddSingleton(_spawn)
+                .AddSingleton(_syrenSpotify)
                 .AddSingleton(lavaConfig)
                 .BuildServiceProvider();
             

@@ -12,7 +12,7 @@ public class Pokemon : ModuleBase<SocketCommandContext>
     [Command("pokedex")]
     public async Task Pokedex([Remainder, Optional] string pageQuery)
     {
-        pageQuery = string.IsNullOrWhiteSpace(pageQuery) ? pageQuery : "1";
+        pageQuery = string.IsNullOrWhiteSpace(pageQuery) ? "1" : pageQuery;
         var text = await File.ReadAllTextAsync("Data/Pokemon/trainers.json");
         var pokemonJson = JsonConvert.DeserializeObject<TrainerJson.TrainerJsonRoot>(text);
         
