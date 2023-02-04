@@ -36,11 +36,12 @@ namespace Syren.Syren
                 Port = 2333,
                 ReconnectAttempts = 100
             };
-            var config = new DiscordSocketConfig
-            {
-                GatewayIntents = GatewayIntents.All
-            };
 
+            var config = new DiscordSocketConfig // GatewayIntents = GatewayIntents.All
+            {
+                GatewayIntents =  GatewayIntents.All
+
+            };
             _syrenSpotify = new SyrenSpotifyClient(spotifyToken);
             _syrenSpotify.Init();
             _client = new DiscordSocketClient(config); 

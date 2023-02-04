@@ -58,15 +58,26 @@ public class SyrenSpotifyClient
         }
         _spotify = new SpotifyClient(new OAuthClient().RequestToken(_credentials).Result);
 
-        var list = _spotify.Playlists.Get(parsedUrl.Result.Instance);
-
+        var list = _spotify.Playlists.GetItems(parsedUrl.Result.Instance, new PlaylistGetItemsRequest { Offset = 0 });
         var result = list.Result;
-
-        if (result.Tracks?.Items == null) return new List<string>();
-
-        var queueableList = new List<string>();
-        foreach (var item in result.Tracks.Items)
+        if (result.Items == null) return new List<string>();
+        var tracklist = new List<PlaylistTrack<IPlayableItem>>();
+        while (!(result.Items.Count == 0))
         {
+
+           foreach(var track in result.Items)
+            {
+                tracklist.Add(track);
+            }
+            result.Offset += 100;
+            list = _spotify.Playlists.GetItems(parsedUrl.Result.Instance, new PlaylistGetItemsRequest { Offset = result.Offset });
+            result = list.Result;
+        }
+        Console.WriteLine(tracklist.Count);
+        var queueableList = new List<string>();
+        foreach (var item in tracklist)
+        {
+            Console.WriteLine(item);
             if (item.Track is FullTrack track)
             {
                 var artist = track.Artists.Count == 0 ? "" : track.Artists[0].Name;
@@ -77,7 +88,7 @@ public class SyrenSpotifyClient
     }
 
     public Task<StatusReport> ParseUrl(string url)
-    { //https://open.spotify.com/playlist/0mvHxwGeI3EBFvK7aJZqfe?si=2e34339948c94542
+    { //Example https://open.spotify.com/playlist/0mvHxwGeI3EBFvK7aJZqfe?si=2e34339948c94542
         if (url.StartsWith("https://open.spotify.com"))
         {
             url = url.Replace("https://open.spotify.com/playlist/", "");

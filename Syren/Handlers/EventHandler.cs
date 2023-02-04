@@ -1,6 +1,4 @@
-﻿using System.Threading.Tasks;
-using Discord.Commands;
-using Discord.Interactions;
+﻿using Discord.Commands;
 using Discord.WebSocket;
 using Newtonsoft.Json;
 using Syren.Syren.DataTypes;
