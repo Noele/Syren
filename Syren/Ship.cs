@@ -83,6 +83,7 @@ namespace Syren.Syren
         private async Task RegisterEvents()
         {
             _client.MessageReceived += new Events.EventHandler(_spawn, _client).OnMessage;
+            _client.MessageReceived += new Commands.Ai( _client).chat;
         }
 
 

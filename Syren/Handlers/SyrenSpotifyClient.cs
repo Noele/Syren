@@ -20,7 +20,7 @@ public class SyrenSpotifyClient
     {
         this._bearer = bearer;
         this._client = new HttpClient();
-        this._credentials = new ClientCredentialsRequest("d8e943c01f6b4721afb16ec0903f93f2", "a04444662ae74a25a553ccb361f55d61"); // TO:DO REMOVE
+        this._credentials = new ClientCredentialsRequest("", "");
         this._spotify = new SpotifyClient(new OAuthClient().RequestToken(this._credentials).Result);
 
     }
@@ -73,11 +73,9 @@ public class SyrenSpotifyClient
             list = _spotify.Playlists.GetItems(parsedUrl.Result.Instance, new PlaylistGetItemsRequest { Offset = result.Offset });
             result = list.Result;
         }
-        Console.WriteLine(tracklist.Count);
         var queueableList = new List<string>();
         foreach (var item in tracklist)
         {
-            Console.WriteLine(item);
             if (item.Track is FullTrack track)
             {
                 var artist = track.Artists.Count == 0 ? "" : track.Artists[0].Name;
