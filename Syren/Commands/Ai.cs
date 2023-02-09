@@ -37,7 +37,7 @@ namespace Syren.Syren.Commands
                 content.Append("{");
                 content.Append("\"model\": \"" + model + "\",");
                 content.Append("\"prompt\": \"" + input + "\",");
-                content.Append("\"max_tokens\": 100");
+                content.Append("\"max_tokens\": 100,");
                 content.Append("\"temperature\": 0.5");
                 content.Append("}");
 
