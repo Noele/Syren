@@ -1,4 +1,4 @@
-﻿using Discord.Commands;
+using Discord.Commands;
 using Discord.WebSocket;
 using Newtonsoft.Json;
 using Syren.Syren.DataTypes;
@@ -19,12 +19,15 @@ namespace Syren.Syren.Commands
 
         public async Task chat(SocketMessage message)
         {
-            if (message.Content.Contains(_client.CurrentUser.Id.ToString()))
+            if (message.Content.Contains(_client.CurrentUser.Id.ToString().Remove(5)))
             {
-                var input = message.Content.Replace($"<@{_client.CurrentUser.Id}>", "").Trim();
-                Console.WriteLine(input);
+                var input = message.Content.Replace($"<@{_client.CurrentUser.Id.ToString()}>", "").Trim();
+                if(input.StartsWith("<@&"))
+                {
+                    input = input.Substring(22).Trim();
+                }
                 if (input == null) return;
-                string apiKey = "";
+                string apiKey = "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";
                 var model = "text-davinci-003";
 
                 var client = new HttpClient();
