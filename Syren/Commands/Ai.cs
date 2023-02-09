@@ -27,7 +27,7 @@ namespace Syren.Syren.Commands
                     input = input.Substring(22).Trim();
                 }
                 if (input == null) return;
-                string apiKey = "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";
+                string apiKey = "";
                 var model = "text-davinci-003";
 
                 var client = new HttpClient();
