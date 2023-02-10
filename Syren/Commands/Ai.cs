@@ -1,6 +1,7 @@
 using Discord.Commands;
 using Discord.WebSocket;
 using Newtonsoft.Json;
+using SpotifyAPI.Web;
 using Syren.Syren.DataTypes;
 using System;
 using System.Net;
@@ -19,14 +20,10 @@ namespace Syren.Syren.Commands
 
         public async Task chat(SocketMessage message)
         {
-            if (message.Content.Contains(_client.CurrentUser.Id.ToString().Remove(5)))
+            if (message.Content.Contains($"<@{_client.CurrentUser.Id}>"))
             {
-                var input = message.Content.Replace($"<@{_client.CurrentUser.Id.ToString()}>", "").Trim();
-                if(input.StartsWith("<@&"))
-                {
-                    input = input.Substring(22).Trim();
-                }
-                if (input == null) return;
+                var input = message.Content.Replace($"<@{_client.CurrentUser.Id}>", "").Trim();
+
                 string apiKey = "";
                 var model = "text-davinci-003";
 
