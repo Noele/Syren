@@ -15,6 +15,12 @@ namespace Syren.Syren.Commands
 {
     public class Fortnite : ModuleBase<SocketCommandContext>
     {
+        private ApiKeys _apiKeys;
+        public Fortnite(ApiKeys apiKeys)
+        {
+            _apiKeys = apiKeys;
+        }
+
         [Command("fortnite"), Alias("fn")]
         public async Task fortnite([Optional] string name, [Optional] string season)
         {
@@ -26,7 +32,7 @@ namespace Syren.Syren.Commands
                 return;
             }
             var client = new HttpClient();
-            client.DefaultRequestHeaders.Add("Authorization", $"");
+            client.DefaultRequestHeaders.Add("Authorization", _apiKeys.fortniteApiKey);
 
 
             var response = client.GetAsync($"https://fortnite-api.com/v2/stats/br/v2?name={name}&image=all&timeWindow={season}").Result;

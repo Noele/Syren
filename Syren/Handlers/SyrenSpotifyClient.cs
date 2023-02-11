@@ -1,6 +1,7 @@
 ﻿using Discord.WebSocket;
 using Newtonsoft.Json;
 using SpotifyAPI.Web;
+using Syren.Syren.DataTypes;
 
 namespace Syren.Syren.Events;
 
@@ -12,23 +13,15 @@ public class StatusReport
 
 public class SyrenSpotifyClient
 {
-    private readonly string _bearer;
     private HttpClient _client;
     private SpotifyClient _spotify;
     private ClientCredentialsRequest _credentials;
-    public SyrenSpotifyClient(string bearer)
+    public SyrenSpotifyClient(ApiKeys apiKeys)
     {
-        this._bearer = bearer;
         this._client = new HttpClient();
-        this._credentials = new ClientCredentialsRequest("", "");
+        this._credentials = new ClientCredentialsRequest(apiKeys.spotifyClientId, apiKeys.spotifyClientSecret);
         this._spotify = new SpotifyClient(new OAuthClient().RequestToken(this._credentials).Result);
 
-    }
-
-    public void Init()
-    {
-        _client.DefaultRequestHeaders.Add("Authorization", $"Bearer {_bearer}");
-        
     }
     public string? GetTrack(string Query)
     {
@@ -40,7 +33,7 @@ public class SyrenSpotifyClient
         _spotify = new SpotifyClient(new OAuthClient().RequestToken(_credentials).Result);
 
         var song = _spotify.Tracks.Get(parsedUrl.Result.Instance).Result;
-        Console.WriteLine(song);
+
         if (song != null)
         {
             var artist = song.Artists.Count == 0 ? "" : song.Artists[0].Name;

@@ -8,27 +8,28 @@ using Microsoft.Extensions.DependencyInjection;
 using Syren.Syren.DataTypes;
 using Syren.Syren.Events;
 using Victoria;
-using Spotify = Syren.Syren.DataTypes.Spotify;
 
 namespace Syren.Syren
 {
     public class Ship
     {
-        
         private string _prefix;
         private string _token;
         private Spawn _spawn;
+        private ApiKeys _apiKeys;
         private AudioHandler _audioHandler;
         private DiscordSocketClient _client;
         private CommandService _commands;
         private IServiceProvider _services;
         private LavaNode _lavaNode;
         private SyrenSpotifyClient _syrenSpotify;
-        public async Task SetSail(string token, string prefix, string channelId, string spotifyToken)
+        public async Task SetSail(string token, string prefix, string channelId, string spotifyClientId, string spotifyClientSecret, string aiApiKey, string fortniteApiKey)
         {
             _prefix = prefix;
             _token = token;
+            _apiKeys = new ApiKeys() { aiApiKey = aiApiKey, spotifyClientId = spotifyClientId, spotifyClientSecret = spotifyClientSecret, fortniteApiKey = fortniteApiKey };   
 
+             
             var lavaConfig = new LavaConfig()
             {
                 Authorization = "The Syren",
@@ -37,13 +38,12 @@ namespace Syren.Syren
                 ReconnectAttempts = 100
             };
 
-            var config = new DiscordSocketConfig // GatewayIntents = GatewayIntents.All
+            var config = new DiscordSocketConfig
             {
                 GatewayIntents =  GatewayIntents.All
 
             };
-            _syrenSpotify = new SyrenSpotifyClient(spotifyToken);
-            _syrenSpotify.Init();
+            _syrenSpotify = new SyrenSpotifyClient(_apiKeys);
             _client = new DiscordSocketClient(config); 
             _commands = new CommandService();
             _spawn = new Spawn(channelId);
@@ -52,6 +52,7 @@ namespace Syren.Syren
                 .AddSingleton(_client)      
                 .AddSingleton(_commands)     
                 .AddSingleton(_lavaNode)
+                .AddSingleton(_apiKeys)
                 .AddSingleton(_spawn)
                 .AddSingleton(_syrenSpotify)
                 .AddSingleton(lavaConfig)
@@ -83,7 +84,7 @@ namespace Syren.Syren
         private async Task RegisterEvents()
         {
             _client.MessageReceived += new Events.EventHandler(_spawn, _client).OnMessage;
-            _client.MessageReceived += new Commands.Ai( _client).chat;
+            _client.MessageReceived += new Commands.Ai( _client, _apiKeys).chat;
         }
 
 
@@ -115,6 +116,5 @@ namespace Syren.Syren
                         await message.Channel.SendMessageAsync(result.ErrorReason); // send the error reason
             }
         }
-        
     }
 }
