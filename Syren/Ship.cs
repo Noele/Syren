@@ -3,6 +3,7 @@ using System.Reflection;
 using System.Threading.Tasks;
 using Discord;
 using Discord.Commands;
+using Discord.Interactions;
 using Discord.WebSocket;
 using Microsoft.Extensions.DependencyInjection;
 using Syren.Syren.DataTypes;
@@ -23,6 +24,7 @@ namespace Syren.Syren
         private IServiceProvider _services;
         private LavaNode _lavaNode;
         private SyrenSpotifyClient _syrenSpotify;
+        private InteractionService _interactionService;
         public async Task SetSail(string token, string prefix, string channelId, string spotifyClientId, string spotifyClientSecret, string aiApiKey, string fortniteApiKey)
         {
             _prefix = prefix;
@@ -48,10 +50,12 @@ namespace Syren.Syren
             _commands = new CommandService();
             _spawn = new Spawn(channelId);
             _lavaNode = new LavaNode(_client, lavaConfig);
+            _interactionService = new InteractionService(_client, new InteractionServiceConfig());
             _services = new ServiceCollection()  
                 .AddSingleton(_client)      
                 .AddSingleton(_commands)     
                 .AddSingleton(_lavaNode)
+                .AddSingleton(_interactionService)
                 .AddSingleton(_apiKeys)
                 .AddSingleton(_spawn)
                 .AddSingleton(_syrenSpotify)
@@ -65,7 +69,9 @@ namespace Syren.Syren
 
             await RegisterEvents(); // Register our events
             
-            await RegisterCommandsAsync(); // Register our commands
+            await RegisterCommandsAsync(); // Register our prefix commands
+
+            await RegisterInteractions(); // Register our slash commands
 
             await _client.LoginAsync(TokenType.Bot, _token); // Login to discord
 
@@ -75,10 +81,27 @@ namespace Syren.Syren
 
         }
         
+        private async Task RegisterInteractions()
+        {
+            await _interactionService.AddModulesAsync(Assembly.GetEntryAssembly(), _services);
+            _client.InteractionCreated += HandleInteraction;
+        }
+
+        private async Task HandleInteraction(SocketInteraction arg)
+        {
+           try
+            {
+                var ctx = new SocketInteractionContext(_client, arg);
+                await _interactionService.ExecuteCommandAsync(ctx, _services);
+            }
+            catch(Exception e) { Console.WriteLine(e); }
+        }
+
         private async Task OnReadyAsync() {
             if (!_lavaNode.IsConnected) {
                 _lavaNode.ConnectAsync();
             }
+            await _interactionService.RegisterCommandsGloballyAsync();
         }
         
         private async Task RegisterEvents()

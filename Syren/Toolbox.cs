@@ -33,7 +33,6 @@ public class Toolbox
             var isNumeric = int.TryParse(pageQuery, out pagenumber);
             pagenumber = isNumeric && pagenumber >= 1 ? pagenumber : 1;
         }
-
         var index = 1;
         foreach (var line in stringList)
         {
