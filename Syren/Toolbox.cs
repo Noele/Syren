@@ -16,6 +16,17 @@ public class Toolbox
 
         return list;
     }
+
+    private static List<string> RIList = new List<string>() {":zero:", ":one:", ":two:", ":three:", ":four:", ":five:", ":six:", ":seven:", ":eight:", ":nine:"};
+    public static string GetRegionalIndicator(int number)
+    {
+        var output = "";
+        foreach(var character in number.ToString())
+        {
+            output += RIList[int.Parse(character.ToString())];
+        }
+        return output;
+    }
     
     public static (string, int, int) CreatePageFromList(List<string> stringList, string pageQuery, bool sort, int length, bool enumerate)
     {

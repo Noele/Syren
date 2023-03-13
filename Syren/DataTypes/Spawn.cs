@@ -1,10 +1,10 @@
 ﻿namespace Syren.Syren.DataTypes;
 
-public class Spawn
+public class PokemonSpawn
 {
     public string PokemonName = "";
     public readonly string ChannelId;
-    public Spawn(string channelId)
+    public PokemonSpawn(string channelId)
     {
         ChannelId = channelId;
     }

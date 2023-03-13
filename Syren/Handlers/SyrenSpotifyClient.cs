@@ -50,7 +50,7 @@ public class SyrenSpotifyClient
             return new List<string>();
         }
         _spotify = new SpotifyClient(new OAuthClient().RequestToken(_credentials).Result);
-
+        
         var list = _spotify.Playlists.GetItems(parsedUrl.Result.Instance, new PlaylistGetItemsRequest { Offset = 0 });
         var result = list.Result;
         if (result.Items == null) return new List<string>();

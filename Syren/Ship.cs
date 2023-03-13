@@ -16,7 +16,8 @@ namespace Syren.Syren
     {
         private string _prefix;
         private string _token;
-        private Spawn _spawn;
+        private PokemonSpawn _pokemonSpawn;
+        private LeagueOfLegendsSpawn _leagueOfLegendsSpawn;
         private ApiKeys _apiKeys;
         private AudioHandler _audioHandler;
         private DiscordSocketClient _client;
@@ -25,7 +26,7 @@ namespace Syren.Syren
         private LavaNode _lavaNode;
         private SyrenSpotifyClient _syrenSpotify;
         private InteractionService _interactionService;
-        public async Task SetSail(string token, string prefix, string channelId, string spotifyClientId, string spotifyClientSecret, string aiApiKey, string fortniteApiKey)
+        public async Task SetSail(string token, string prefix, string pokemonChannelID, string leagueoflegendsChannelID,  string spotifyClientId, string spotifyClientSecret, string aiApiKey, string fortniteApiKey)
         {
             _prefix = prefix;
             _token = token;
@@ -48,7 +49,8 @@ namespace Syren.Syren
             _syrenSpotify = new SyrenSpotifyClient(_apiKeys);
             _client = new DiscordSocketClient(config); 
             _commands = new CommandService();
-            _spawn = new Spawn(channelId);
+            _pokemonSpawn = new PokemonSpawn(pokemonChannelID);
+            _leagueOfLegendsSpawn = new LeagueOfLegendsSpawn(leagueoflegendsChannelID);
             _lavaNode = new LavaNode(_client, lavaConfig);
             _interactionService = new InteractionService(_client, new InteractionServiceConfig());
             _services = new ServiceCollection()  
@@ -57,7 +59,8 @@ namespace Syren.Syren
                 .AddSingleton(_lavaNode)
                 .AddSingleton(_interactionService)
                 .AddSingleton(_apiKeys)
-                .AddSingleton(_spawn)
+                .AddSingleton(_pokemonSpawn)
+                .AddSingleton(_leagueOfLegendsSpawn)
                 .AddSingleton(_syrenSpotify)
                 .AddSingleton(lavaConfig)
                 .BuildServiceProvider();
@@ -106,8 +109,7 @@ namespace Syren.Syren
         
         private async Task RegisterEvents()
         {
-            _client.MessageReceived += new Events.EventHandler(_spawn, _client).OnMessage;
-            _client.MessageReceived += new Commands.Ai( _client, _apiKeys).chat;
+            _client.MessageReceived += new Events.EventHandler(_pokemonSpawn, _client, _leagueOfLegendsSpawn, _apiKeys).OnMessage;
         }
 
 

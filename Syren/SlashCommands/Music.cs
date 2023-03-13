@@ -164,7 +164,7 @@ public class Music : InteractionModuleBase<SocketInteractionContext> {
             foreach (var track in response)
             {
                 await PlayTrackAsync(track, false, false);
-            }
+            } 
             await FollowupAsync($"Enqueued {response.Count} songs.");
         }
 

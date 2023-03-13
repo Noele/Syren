@@ -40,16 +40,14 @@ public class AudioHandler
     
     private async Task OnTrackException(TrackExceptionEventArgs arg) {
         Console.WriteLine($"Track {arg.Track.Title} threw an exception. Please check Lavalink console/logs.");
-        arg.Player.Queue.Enqueue(arg.Track);
-        await arg.Player.TextChannel.SendMessageAsync(
-            $"{arg.Track.Title} has been re-added to queue after throwing an exception.");
+        await arg.Player.SkipAsync();
+        await arg.Player.TextChannel.SendMessageAsync($"{arg.Track.Title} has been skipped after throwing an exception.");
     }
     private async Task OnTrackStuck(TrackStuckEventArgs arg) {
         Console.WriteLine(
             $"Track {arg.Track.Title} got stuck for {arg.Threshold}ms. Please check Lavalink console/logs.");
-        arg.Player.Queue.Enqueue(arg.Track);
-        await arg.Player.TextChannel.SendMessageAsync(
-            $"{arg.Track.Title} has been re-added to queue after getting stuck.");
+        await arg.Player.SkipAsync();
+        await arg.Player.TextChannel.SendMessageAsync($"{arg.Track.Title} has been skipped after getting stuck.");
     }
 
     private Task OnWebSocketClosed(WebSocketClosedEventArgs arg) {
