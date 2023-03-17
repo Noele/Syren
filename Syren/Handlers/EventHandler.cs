@@ -1,4 +1,5 @@
-﻿using Discord.Commands;
+﻿using Discord;
+using Discord.Commands;
 using Discord.WebSocket;
 using Newtonsoft.Json;
 using Syren.Syren.DataTypes;
@@ -9,27 +10,28 @@ public class EventHandler
 {
     private PokemonSpawn _spawn;
     private DiscordSocketClient _client;
-    private Ai _ai;
-    private Pokemon _pokemon;
-    private LeagueOfLegends _leagueOfLegends;
     private LeagueOfLegendsSpawn _leagueOfLegendsSpawn;
+
+    private List<Event> _events;
 
     public EventHandler(PokemonSpawn spawn, DiscordSocketClient client, LeagueOfLegendsSpawn leagueOfLegendsSpawn, ApiKeys apiKeys)
     {
         _spawn = spawn;
         _client = client;
         _leagueOfLegendsSpawn = leagueOfLegendsSpawn;
-
-        _ai = new Ai(client, apiKeys);
-        _pokemon = new Pokemon(spawn, client);
-        _leagueOfLegends = new LeagueOfLegends(leagueOfLegendsSpawn, client);
-
+        _events = new List<Event>() { new Ai(client, apiKeys), new Pokemon(spawn, client), new LeagueOfLegends(leagueOfLegendsSpawn, client) };
     }
 
     public async Task OnMessage(SocketMessage message)
     {
-        await _ai.run(message);
-        await _pokemon.run(message);
-        await _leagueOfLegends.run(message);
+        if (message.Author.IsBot) return;
+        var context = new SocketCommandContext(_client, message as SocketUserMessage);
+        var isChannelDM = message.Channel.GetChannelType() == ChannelType.DM;
+
+        foreach (var even in _events)
+        {
+            if (even.GuildOnly && isChannelDM) continue;
+            even.run(message, context);
+        }
     }
 }

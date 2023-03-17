@@ -14,7 +14,7 @@ namespace Syren.Syren.Events
     {
         private readonly Rectangle Source = new Rectangle(0, 0, 1215, 717);
         private readonly Rectangle ViewPort = new Rectangle(0, 0, 250, 250);
-
+        public override bool GuildOnly => true;
         private string _champion = "";
         private LeagueOfLegendsSpawn _leagueOfLegendsSpawn;
         private DiscordSocketClient _client;
@@ -22,16 +22,17 @@ namespace Syren.Syren.Events
         private int guesses = 0;
         private List<ulong> uniquePlayers = new List<ulong>();
 
+
+        private LeagueChampionNames championNames;
         public LeagueOfLegends(LeagueOfLegendsSpawn leagueOfLegendsSpawn, DiscordSocketClient client)
         {
             this._leagueOfLegendsSpawn = leagueOfLegendsSpawn;
             this._client = client;
+            championNames = JsonConvert.DeserializeObject<LeagueChampionNames>(File.ReadAllText("Data/LeagueOfLegends/Champions.json"));
         }
-        public override async Task run(SocketMessage message)
+        public override async Task run(SocketMessage message, SocketCommandContext context)
         {
-            if (message.Author.IsBot) return;
-            var Context = new SocketCommandContext(_client, message as SocketUserMessage);
-            var channel = Context.Guild.GetChannel(Convert.ToUInt64(_leagueOfLegendsSpawn.ChannelId)) as ISocketMessageChannel;
+            var channel = context.Guild.GetChannel(Convert.ToUInt64(this._leagueOfLegendsSpawn.ChannelId)) as ISocketMessageChannel;
             if (message.Channel.Id.ToString() != _leagueOfLegendsSpawn.ChannelId) return;
 
             var text = File.ReadAllText("Data/LeagueOfLegends/players.json");
@@ -47,7 +48,7 @@ namespace Syren.Syren.Events
                 await CreateNewPlayer(message, playerData);
             }
             var guess = Regex.Replace(message.Content, @"\s+", "");
-            guess = Regex.Replace(message.Content, "'", "");
+            guess = Regex.Replace(guess, "'", "");
             if (string.Equals(guess, _champion, StringComparison.CurrentCultureIgnoreCase)) {
                 var pointsAdded = AddPointsToPlayer(message, playerData);
                 await channel.SendMessageAsync($"<@{message.Author.Id}> Correct ! {pointsAdded} points have been added.");
@@ -62,17 +63,17 @@ namespace Syren.Syren.Events
                     await SpawnNewChampion(message.Channel);
                 } else
                 {
-                    guesses += 1;
+                    if(this.championNames.Names.Contains(guess, StringComparer.OrdinalIgnoreCase))
+                    {
+                        guesses += 1;
+                    }
                 }
             }
         }
 
-        private LeagueChampionNames GetLeagueChampions() => JsonConvert.DeserializeObject<LeagueChampionNames>(File.ReadAllText("Data/LeagueOfLegends/Champions.json"));
-
         private async Task SpawnNewChampion(IMessageChannel channel)
         {
-            var champions = GetLeagueChampions();
-            var champion = champions.Names[new Random().Next(champions.Names.Length)];
+            var champion = this.championNames.Names[new Random().Next(this.championNames.Names.Length)];
             var championImage = Image.Load(File.OpenRead($"Data/LeagueOfLegends/ChampionSplash/{champion}-0.jpg"));
             var random = new Random();
 

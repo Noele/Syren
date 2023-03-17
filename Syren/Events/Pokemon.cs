@@ -14,19 +14,16 @@ namespace Syren.Syren.Events
     {
         private PokemonSpawn _spawn;
         private DiscordSocketClient _client;
-
+        public override bool GuildOnly => true;
         public Pokemon(PokemonSpawn spawn, DiscordSocketClient client)
         {
             _spawn = spawn;
             _client = client;
         }
 
-        public override async Task run(SocketMessage message)
+        public override async Task run(SocketMessage message, SocketCommandContext context)
         {
-            if (message.Author.IsBot) return;
-            var Context = new SocketCommandContext(_client, message as SocketUserMessage);
-
-            var channel = Context.Guild.GetChannel(Convert.ToUInt64(_spawn.ChannelId)) as ISocketMessageChannel;
+            var channel = context.Guild.GetChannel(Convert.ToUInt64(this._spawn.ChannelId)) as ISocketMessageChannel;
             if (string.IsNullOrEmpty(_spawn.PokemonName))
             {
                 var randomNumber = new Random().Next(0, 10);
@@ -51,7 +48,7 @@ namespace Syren.Syren.Events
             {
                 if (string.Equals(message.Content, _spawn.PokemonName, StringComparison.CurrentCultureIgnoreCase))
                 {
-                    await Context.Channel.SendMessageAsync($"Correct! {_spawn.PokemonName} was added to your Pokédex.");
+                    await context.Channel.SendMessageAsync($"Correct! {_spawn.PokemonName} was added to your Pokédex.");
                     var text = await File.ReadAllTextAsync("Data/Pokemon/trainers.json");
                     var pokemonJson = JsonConvert.DeserializeObject<TrainerJson.TrainerJsonRoot>(text);
                     var added = false;
@@ -66,7 +63,7 @@ namespace Syren.Syren.Events
                                 var randomNumber = new Random().Next(0, 50);
                                 if (randomNumber == 40)
                                 {
-                                    await Context.Channel.SendMessageAsync($"Oh ? ... {_spawn.PokemonName} was actually a Ditto ! Ditto has been added to your pokédex !");
+                                    await context.Channel.SendMessageAsync($"Oh ? ... {_spawn.PokemonName} was actually a Ditto ! Ditto has been added to your pokédex !");
                                     pokemonJson.Trainers[i].Info.CapturedPokemon.Add("Ditto");
                                 }
                             }
@@ -79,7 +76,7 @@ namespace Syren.Syren.Events
                             if (new Random().Next(0, 8192) == 6969)
                             {
                                 pokemonJson.Trainers[i].Info.CapturedPokemon.Add($"Shiny-{_spawn.PokemonName}");
-                                await Context.Channel.SendMessageAsync($"Oh ? ... {_spawn.PokemonName} was actually a Shiny ! Shiny-{_spawn.PokemonName} has been added to your pokédex !");
+                                await context.Channel.SendMessageAsync($"Oh ? ... {_spawn.PokemonName} was actually a Shiny ! Shiny-{_spawn.PokemonName} has been added to your pokédex !");
                             }
 
                         }

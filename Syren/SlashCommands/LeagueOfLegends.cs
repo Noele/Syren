@@ -27,7 +27,7 @@ namespace Syren.Syren.SlashCommands
                 dict.Add(player.name, player.points);
             }
 
-            var sortedDict = from entry in dict orderby entry.Value ascending select entry;
+            var sortedDict = from entry in dict orderby entry.Value descending select entry;
 
             var stringBuilder = new StringBuilder();
             var index = 2;

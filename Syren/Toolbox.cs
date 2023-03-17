@@ -2,7 +2,7 @@
 
 namespace Syren.Syren;
 
-public class Toolbox
+public static class Toolbox
 {
     public static List<T>  Shuffle<T>(List<T> list)  
     {  
@@ -15,6 +15,11 @@ public class Toolbox
         }
 
         return list;
+    }
+
+    public static bool Contains(this string source, string toCheck, StringComparison comp)
+    {
+        return source?.IndexOf(toCheck, comp) >= 0;
     }
 
     private static List<string> RIList = new List<string>() {":zero:", ":one:", ":two:", ":three:", ":four:", ":five:", ":six:", ":seven:", ":eight:", ":nine:"};
