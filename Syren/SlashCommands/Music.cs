@@ -6,7 +6,9 @@ using Discord.Interactions;
 using SpotifyAPI.Web.Http;
 using Syren.Syren.Events;
 using Victoria;
-using Victoria.Enums;
+using Victoria.Node;
+using Victoria.Player;
+using Victoria.Player.Args;
 using Victoria.Responses.Search;
 using static Syren.Syren.DataTypes.Spotify;
 using RunMode = Discord.Interactions.RunMode;
@@ -26,12 +28,26 @@ public class Music : InteractionModuleBase<SocketInteractionContext> {
     [SlashCommand("join", "Makes the bot join the channel you are currently in")]
     public async Task JoinAsync() {
         await DeferAsync();
+        var voiceState = Context.User as IVoiceState;
         if (_lavaNode.HasPlayer(Context.Guild)) {
+            if(_lavaNode.TryGetPlayer(Context.Guild, out var player))
+            {
+                if (player.Vueue.Count == 0)
+                {
+                    var voiceChannel = (Context.User as IVoiceState)?.VoiceChannel ?? player.VoiceChannel;
+                    if (voiceState?.VoiceChannel != null)
+                    {
+                        await _lavaNode.LeaveAsync(voiceChannel);
+                        await _lavaNode.JoinAsync(voiceState.VoiceChannel, Context.Channel as ITextChannel);
+                        await FollowupAsync("Refreshed player instance.");
+                        return;
+                    }
+                }
+            }
             await FollowupAsync("I'm already connected to a voice channel!");
             return;
         }
 
-        var voiceState = Context.User as IVoiceState;
         if (voiceState?.VoiceChannel == null) {
             await FollowupAsync("You must be connected to a voice channel!");
             return;
@@ -54,12 +70,12 @@ public class Music : InteractionModuleBase<SocketInteractionContext> {
             await FollowupAsync("I'm not connected to a voice channel.");
             return;
         }
-        if (player.Queue.Count == 0) {
+        if (player.Vueue.Count == 0) {
             await FollowupAsync("There are no tracks in the queue");
             return;
         }
         
-        player.Queue.Shuffle();
+        player.Vueue.Shuffle();
         await FollowupAsync("Shuffled.");
     }
 
@@ -95,12 +111,12 @@ public class Music : InteractionModuleBase<SocketInteractionContext> {
             await FollowupAsync("I'm not connected to a voice channel.");
             return;
         }
-        if (player.Queue.Count == 0) {
+        if (player.Vueue.Count == 0) {
             await FollowupAsync("There are no tracks in the queue");
             return;
         }
 
-        var trackNames = player.Queue.Select(track => track.Title).ToList();
+        var trackNames = player.Vueue.Select(track => track.Title).ToList();
 
         var (page, pageCount, pagenumber) = Toolbox.CreatePageFromList(trackNames, pageQuery, false, 700, true);
                 
@@ -191,18 +207,23 @@ public class Music : InteractionModuleBase<SocketInteractionContext> {
             await FollowupAsync($"I wasn't able to find anything for `{searchQuery}`.");
             return;
         }
-
-        var player = _lavaNode.GetPlayer(Context.Guild);
+        LavaPlayer<LavaTrack>? player = null;
+        var getPlayer = _lavaNode.TryGetPlayer(Context.Guild, out player);
+        if(!getPlayer)
+        {
+            await FollowupAsync("No LavaPlayer found.");
+            return;
+        }
         if (!string.IsNullOrWhiteSpace(searchResponse.Playlist.Name)) {
             if (shuffle)
             {
                 var tracks = searchResponse.Tracks.ToList();
                 tracks = Toolbox.Shuffle(tracks);
-                player.Queue.Enqueue(tracks);
+                player.Vueue.Enqueue(tracks);
             }
             else
             {
-                player.Queue.Enqueue(searchResponse.Tracks);
+                player.Vueue.Enqueue(searchResponse.Tracks);
 
 
             }
@@ -211,7 +232,7 @@ public class Music : InteractionModuleBase<SocketInteractionContext> {
         }
         else {
             var track = searchResponse.Tracks.FirstOrDefault();
-            player.Queue.Enqueue(track);
+            player.Vueue.Enqueue(track);
             if(shouldOutput)
                 await FollowupAsync($"Enqueued {track?.Title}");
         }
@@ -220,11 +241,8 @@ public class Music : InteractionModuleBase<SocketInteractionContext> {
             return;
         }
 
-        player.Queue.TryDequeue(out var lavaTrack);
-        await player.PlayAsync(x => {
-            x.Track = lavaTrack;
-            x.ShouldPause = false;
-        });
+        player.Vueue.TryDequeue(out var lavaTrack);
+        await player.PlayAsync(lavaTrack);
     }
     
     [SlashCommand("remove", "Removes a song at a queue position, Use /playlist for the queue id"), Alias("dq", "dequeue")]
@@ -236,7 +254,7 @@ public class Music : InteractionModuleBase<SocketInteractionContext> {
             return;
         }
 
-        if (player.Queue.Count == 0) {
+        if (player.Vueue.Count == 0) {
             await FollowupAsync("Nothing in the queue to remove.");
             return;
         }
@@ -248,13 +266,13 @@ public class Music : InteractionModuleBase<SocketInteractionContext> {
             return;
         }
         
-        if (index - 1 < 0 || index - 1 > player.Queue.Count)
+        if (index - 1 < 0 || index - 1 > player.Vueue.Count)
         {
             await FollowupAsync($"Can't remove the track at index {removeQuery}");
             return;
         }
         
-        var track = player.Queue.RemoveAt(index - 1);
+        var track = player.Vueue.RemoveAt(index - 1);
         await FollowupAsync($"Removed {track.Title}");
     }
 
@@ -269,7 +287,7 @@ public class Music : InteractionModuleBase<SocketInteractionContext> {
         
         await FollowupAsync("Stopping.");
         await player.StopAsync();
-        player.Queue.Clear();
+        player.Vueue.Clear();
     }
 
     [SlashCommand("skip", "Skips the currently playing song")]

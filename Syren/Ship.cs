@@ -6,9 +6,12 @@ using Discord.Commands;
 using Discord.Interactions;
 using Discord.WebSocket;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 using Syren.Syren.DataTypes;
 using Syren.Syren.Events;
 using Victoria;
+using Victoria.Node;
 
 namespace Syren.Syren
 {
@@ -30,15 +33,14 @@ namespace Syren.Syren
         {
             _prefix = prefix;
             _token = token;
-            _apiKeys = new ApiKeys() { aiApiKey = aiApiKey, spotifyClientId = spotifyClientId, spotifyClientSecret = spotifyClientSecret, fortniteApiKey = fortniteApiKey };   
+            _apiKeys = new ApiKeys() { aiApiKey = aiApiKey, spotifyClientId = spotifyClientId, spotifyClientSecret = spotifyClientSecret, fortniteApiKey = fortniteApiKey };
 
-             
-            var lavaConfig = new LavaConfig()
+
+            var lavaConfig = new NodeConfiguration()
             {
                 Authorization = "The Syren",
                 Hostname = "localhost",
-                Port = 2333,
-                ReconnectAttempts = 100
+                Port = 2333
             };
 
             var config = new DiscordSocketConfig
@@ -46,12 +48,14 @@ namespace Syren.Syren
                 GatewayIntents =  GatewayIntents.All
 
             };
+
+
             _syrenSpotify = new SyrenSpotifyClient(_apiKeys);
             _client = new DiscordSocketClient(config); 
             _commands = new CommandService();
             _pokemonSpawn = new PokemonSpawn(pokemonChannelID);
             _leagueOfLegendsSpawn = new LeagueOfLegendsSpawn(leagueoflegendsChannelID);
-            _lavaNode = new LavaNode(_client, lavaConfig);
+            _lavaNode = new LavaNode(_client, lavaConfig, NullLogger<LavaNode>.Instance);
             _interactionService = new InteractionService(_client, new InteractionServiceConfig());
             _services = new ServiceCollection()  
                 .AddSingleton(_client)      
