@@ -33,8 +33,7 @@ namespace Syren.Syren.Commands
             }
             var client = new HttpClient();
             client.DefaultRequestHeaders.Add("Authorization", _apiKeys.fortniteApiKey);
-
-
+            
             var response = client.GetAsync($"https://fortnite-api.com/v2/stats/br/v2?name={name}&image=all&timeWindow={season}").Result;
             if (response.IsSuccessStatusCode) { 
                 var responseString = response.Content.ReadAsStringAsync().Result;

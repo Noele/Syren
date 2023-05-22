@@ -27,7 +27,6 @@ namespace Syren.Syren.SlashCommands
         [SlashCommand("image", "returns a dal-e image from a prompt", runMode: RunMode.Async)]
         public async Task image([Remainder] string prompt)
         {
-            await DeferAsync();
             var url = "https://api.openai.com/v1/images/generations";
             var client = new HttpClient();
 

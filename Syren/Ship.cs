@@ -1,17 +1,13 @@
-﻿using System;
-using System.Reflection;
-using System.Threading.Tasks;
+﻿using System.Reflection;
 using Discord;
 using Discord.Commands;
 using Discord.Interactions;
 using Discord.WebSocket;
+using Lavalink4NET;
+using Lavalink4NET.DiscordNet;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Logging.Abstractions;
 using Syren.Syren.DataTypes;
 using Syren.Syren.Events;
-using Victoria;
-using Victoria.Node;
 
 namespace Syren.Syren
 {
@@ -22,11 +18,9 @@ namespace Syren.Syren
         private PokemonSpawn _pokemonSpawn;
         private LeagueOfLegendsSpawn _leagueOfLegendsSpawn;
         private ApiKeys _apiKeys;
-        private AudioHandler _audioHandler;
         private DiscordSocketClient _client;
         private CommandService _commands;
         private IServiceProvider _services;
-        private LavaNode _lavaNode;
         private SyrenSpotifyClient _syrenSpotify;
         private InteractionService _interactionService;
         public async Task SetSail(string token, string prefix, string pokemonChannelID, string leagueoflegendsChannelID,  string spotifyClientId, string spotifyClientSecret, string aiApiKey, string fortniteApiKey)
@@ -34,43 +28,39 @@ namespace Syren.Syren
             _prefix = prefix;
             _token = token;
             _apiKeys = new ApiKeys() { aiApiKey = aiApiKey, spotifyClientId = spotifyClientId, spotifyClientSecret = spotifyClientSecret, fortniteApiKey = fortniteApiKey };
-
-
-            var lavaConfig = new NodeConfiguration()
-            {
-                Authorization = "The Syren",
-                Hostname = "localhost",
-                Port = 2333
-            };
-
+           
             var config = new DiscordSocketConfig
             {
                 GatewayIntents =  GatewayIntents.All
-
+                
             };
-
-
             _syrenSpotify = new SyrenSpotifyClient(_apiKeys);
             _client = new DiscordSocketClient(config); 
             _commands = new CommandService();
             _pokemonSpawn = new PokemonSpawn(pokemonChannelID);
             _leagueOfLegendsSpawn = new LeagueOfLegendsSpawn(leagueoflegendsChannelID);
-            _lavaNode = new LavaNode(_client, lavaConfig, NullLogger<LavaNode>.Instance);
             _interactionService = new InteractionService(_client, new InteractionServiceConfig());
+            
+            var lavalinkNodeOptions = new LavalinkNodeOptions
+            {
+                RestUri = "http://localhost:8080/",
+                WebSocketUri = "ws://localhost:8080/",
+                Password = "youshallnotpass"
+            };
+
             _services = new ServiceCollection()  
                 .AddSingleton(_client)      
-                .AddSingleton(_commands)     
-                .AddSingleton(_lavaNode)
+                .AddSingleton<IAudioService, LavalinkNode>()
+                .AddSingleton<IDiscordClientWrapper, DiscordClientWrapper>()
+                .AddSingleton(lavalinkNodeOptions)
+                .AddSingleton(_commands)
                 .AddSingleton(_interactionService)
                 .AddSingleton(_apiKeys)
                 .AddSingleton(_pokemonSpawn)
                 .AddSingleton(_leagueOfLegendsSpawn)
                 .AddSingleton(_syrenSpotify)
-                .AddSingleton(lavaConfig)
                 .BuildServiceProvider();
             
-            _audioHandler = new AudioHandler(_lavaNode);
-            _audioHandler.RegisterEvents();
             _client.Ready += OnReadyAsync;
             _client.Log += OnLog; // Signup to the Log event, this outputs almost all messages to the console
 
@@ -96,18 +86,17 @@ namespace Syren.Syren
 
         private async Task HandleInteraction(SocketInteraction arg)
         {
-           try
-            {
-                var ctx = new SocketInteractionContext(_client, arg);
-                await _interactionService.ExecuteCommandAsync(ctx, _services);
-            }
-            catch(Exception e) { Console.WriteLine(e); }
+            try
+           {
+               var ctx = new SocketInteractionContext(_client, arg);
+               await _interactionService.ExecuteCommandAsync(ctx, _services);
+           }
+           catch(Exception e) { Console.WriteLine(e); }
         }
 
         private async Task OnReadyAsync() {
-            if (!_lavaNode.IsConnected) {
-                _lavaNode.ConnectAsync();
-            }
+            var audioService = _services.GetRequiredService<IAudioService>();
+            await audioService.InitializeAsync();
             await _interactionService.RegisterCommandsGloballyAsync();
         }
         
@@ -135,15 +124,22 @@ namespace Syren.Syren
             var context = new SocketCommandContext(_client, message);
             if (message != null && message.Author.IsBot) return;
 
-            var argPos = 0;
-            if (message.HasStringPrefix(_prefix, ref argPos)) // If the message contains the prefix
+            int argPos = 0;
+
+            var result = await _commands.ExecuteAsync(context, argPos, _services, MultiMatchHandling.Best);
+            if (!result.IsSuccess)
             {
-                var result = await _commands.ExecuteAsync(context, argPos, _services); // Execute  the respective command
-                if (!result.IsSuccess) Console.WriteLine(result.ErrorReason); // If the command failed, output the error reason
-                if (result.Error.Equals(CommandError.UnmetPrecondition)) 
-                    if (message != null) // If the message is not null (we have an error to send the user)
-                        await message.Channel.SendMessageAsync(result.ErrorReason); // send the error reason
+                if (result.Error == CommandError.UnmetPrecondition)
+                {
+                    if (message != null)
+                        await message.Channel.SendMessageAsync(result.ErrorReason);
+                }
+                else
+                {
+                    Console.WriteLine(result.ErrorReason);
+                }
             }
         }
+
     }
 }

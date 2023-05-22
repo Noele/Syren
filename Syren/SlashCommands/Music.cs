@@ -1,383 +1,246 @@
-﻿using System.Runtime.InteropServices;
-using System.Text;
-using Discord;
+﻿using Discord;
 using Discord.Commands;
 using Discord.Interactions;
-using SpotifyAPI.Web.Http;
+using Lavalink4NET;
+using Lavalink4NET.Player;
+using Lavalink4NET.Rest;
+using Syren.Syren.DataTypes;
 using Syren.Syren.Events;
-using Victoria;
-using Victoria.Node;
-using Victoria.Player;
-using Victoria.Player.Args;
-using Victoria.Responses.Search;
-using static Syren.Syren.DataTypes.Spotify;
 using RunMode = Discord.Interactions.RunMode;
 
-namespace Syren.Syren.Commands;
-
-public class Music : InteractionModuleBase<SocketInteractionContext> { 
-    private readonly LavaNode _lavaNode;
-    private readonly SyrenSpotifyClient _syrenSpotifyClient;
-
-    public Music(LavaNode lavaNode, SyrenSpotifyClient syrenSpotifyClient)
+namespace Syren.Syren.SlashCommands
+{
+    public class Music : InteractionModuleBase<SocketInteractionContext>
     {
-        _lavaNode = lavaNode;
-        _syrenSpotifyClient = syrenSpotifyClient;
-    }
+        private readonly IAudioService _audioService;
+        private readonly SyrenSpotifyClient _syrenSpotifyClient;
 
-    [SlashCommand("join", "Makes the bot join the channel you are currently in")]
-    public async Task JoinAsync() {
-        await DeferAsync();
-        var voiceState = Context.User as IVoiceState;
-        if (_lavaNode.HasPlayer(Context.Guild)) {
-            if(_lavaNode.TryGetPlayer(Context.Guild, out var player))
+        public Music(IAudioService audioService, ApiKeys apiKeys)
+        {
+            _audioService = audioService;
+            _syrenSpotifyClient = new SyrenSpotifyClient(apiKeys);
+        }
+
+        [SlashCommand("queue", "Sends the current queue")]
+        public async Task Queue([Remainder] string pageQuery = "1")
+        {
+            await DeferAsync(true);
+            var player = await GetPlayerAsync(connectToVoiceChannel: false);
+
+            if (player == null)
             {
-                if (player.Vueue.Count == 0)
+                await FollowupAsync("I'm not connected to a voice channel.");
+                return;
+            }
+
+            if (player.Queue.IsEmpty)
+            {
+                await FollowupAsync("There are no tracks in the queue");
+                return;
+            }
+
+            var trackNames = player.Queue.Select(track => track.Title).ToList();
+
+            var (page, pageCount, pagenumber) = Toolbox.CreatePageFromList(trackNames, pageQuery, false, 700, true);
+
+            await FollowupAsync(text: "", embed: new EmbedBuilder()
+            {
+                Author = new EmbedAuthorBuilder()
                 {
-                    var voiceChannel = (Context.User as IVoiceState)?.VoiceChannel ?? player.VoiceChannel;
-                    if (voiceState?.VoiceChannel != null)
-                    {
-                        await _lavaNode.LeaveAsync(voiceChannel);
-                        await _lavaNode.JoinAsync(voiceState.VoiceChannel, Context.Channel as ITextChannel);
-                        await FollowupAsync("Refreshed player instance.");
-                        return;
-                    }
+                    Name = $"Now playing: {player.CurrentTrack.Title}"
+                },
+                Description = page,
+                Footer = new EmbedFooterBuilder()
+                {
+                    Text = $"Page {pagenumber}/{pageCount}"
                 }
-            }
-            await FollowupAsync("I'm already connected to a voice channel!");
-            return;
+            }.Build());
         }
 
-        if (voiceState?.VoiceChannel == null) {
-            await FollowupAsync("You must be connected to a voice channel!");
-            return;
-        }
-
-        try {
-            await _lavaNode.JoinAsync(voiceState.VoiceChannel, Context.Channel as ITextChannel);
-            await FollowupAsync($"Joined {voiceState.VoiceChannel.Name}!");
-        }
-        catch (Exception exception) {
-            await FollowupAsync(exception.Message);
-        }
-    }
-
-    [SlashCommand("shuffle", "Shuffles the playlist")]
-    public async Task ShuffleAsync()
-    {
-        await DeferAsync();
-        if (!_lavaNode.TryGetPlayer(Context.Guild, out var player)) {
-            await FollowupAsync("I'm not connected to a voice channel.");
-            return;
-        }
-        if (player.Vueue.Count == 0) {
-            await FollowupAsync("There are no tracks in the queue");
-            return;
-        }
-        
-        player.Vueue.Shuffle();
-        await FollowupAsync("Shuffled.");
-    }
-
-    [SlashCommand("leave", "Makes the bot leave the channel its currently in")]
-    public async Task LeaveAsync()
-    {
-        await DeferAsync();
-        if (!_lavaNode.TryGetPlayer(Context.Guild, out var player)) {
-            await FollowupAsync("I'm not connected to any voice channels!");
-            return;
-        }
-
-        var voiceChannel = (Context.User as IVoiceState)?.VoiceChannel ?? player.VoiceChannel;
-        if (voiceChannel == null) {
-            await FollowupAsync("Not sure which voice channel to disconnect from.");
-            return;
-        }
-
-        try {
-            await _lavaNode.LeaveAsync(voiceChannel);
-            await FollowupAsync($"I've left {voiceChannel.Name}!");
-        }
-        catch (Exception exception) {
-            await FollowupAsync(exception.Message);
-        }
-    }
-    
-    [SlashCommand("playlist", "Sends the current playlist"), Alias("list", "q", "queue")]
-    public async Task PlaylistAsync([Remainder] string pageQuery = "1")
-    {
-        await DeferAsync(true);
-        if (!_lavaNode.TryGetPlayer(Context.Guild, out var player)) {
-            await FollowupAsync("I'm not connected to a voice channel.");
-            return;
-        }
-        if (player.Vueue.Count == 0) {
-            await FollowupAsync("There are no tracks in the queue");
-            return;
-        }
-
-        var trackNames = player.Vueue.Select(track => track.Title).ToList();
-
-        var (page, pageCount, pagenumber) = Toolbox.CreatePageFromList(trackNames, pageQuery, false, 700, true);
-                
-        await FollowupAsync(text: "", embed: new EmbedBuilder()
+        [SlashCommand("skip", description: "Skips the currently playing song", runMode: RunMode.Async)]
+        public async Task Skip()
         {
-            Author = new EmbedAuthorBuilder()
+            var player = await GetPlayerAsync(connectToVoiceChannel: false);
+            if (player == null)
             {
-              Name = $"Now playing: {player.Track.Title}"
-            },
-            Description = page,
-            Footer = new EmbedFooterBuilder()
-            {
-                Text = $"Page {pagenumber}/{pageCount}"
+                return;
             }
-        }.Build());
-    }
 
-    [SlashCommand("play", "Plays a song", runMode: RunMode.Async)]
-    public async Task PlayAsync([Remainder, Optional] string searchQuery)
-    {
-        await DeferAsync();
-        if (string.IsNullOrWhiteSpace(searchQuery)) {
-            await FollowupAsync("Please provide search terms.");
-            return;
+            if (player.CurrentTrack == null)
+            {
+                await RespondAsync("Nothing playing!");
+                return;
+            }
+
+            await player.SkipAsync();
+            await RespondAsync("Skipping");
         }
 
-        var shuffle = false;
-        
-        if (searchQuery.EndsWith(" -s", StringComparison.OrdinalIgnoreCase))
+        [SlashCommand("stop", description: "Stops the current track", runMode: RunMode.Async)]
+        public async Task Stop()
         {
-            shuffle = true;
-            searchQuery = searchQuery[..^3];
-        }
-        if (!_lavaNode.HasPlayer(Context.Guild)) {
-            try {
-                var voiceState = Context.User as IVoiceState;
-                if (voiceState?.VoiceChannel == null) {
-                    await FollowupAsync("You must be connected to a voice channel!");
-                    return;
-                }
-                await _lavaNode.JoinAsync(voiceState.VoiceChannel, Context.Channel as ITextChannel);
+            var player = await GetPlayerAsync(connectToVoiceChannel: false);
+
+            if (player == null)
+            {
+                return;
             }
-            catch (Exception exception) {
-                await FollowupAsync(exception.Message);
+
+            if (player.CurrentTrack == null)
+            {
+                await RespondAsync("Nothing playing!");
+                return;
+            }
+
+            await player.StopAsync();
+            await RespondAsync("Stopped playing.");
+        }
+
+
+        [SlashCommand("play", description: "Plays music")]
+        public async Task Play(string searchQuery)
+        {
+            await DeferAsync();
+            var player = await GetPlayerAsync();
+
+            if (player == null)
+            {
+                return;
+            }
+
+            var shuffle = false;
+
+            if (searchQuery.EndsWith(" -s", StringComparison.OrdinalIgnoreCase))
+            {
+                shuffle = true;
+                searchQuery = searchQuery[..^3];
+            }
+
+            switch (GetQueryType(searchQuery))
+            {
+                case SongQueryType.YOUTUBESONG:
+                    await PlayYoutubeSong(searchQuery, player);
+                    break;
+                case SongQueryType.YOUTUBEPLAYLIST:
+                    await PlayYoutubePlaylist(searchQuery, shuffle, player);
+                    break;
+                case SongQueryType.SPOTIFYSONG:
+                    await PlaySpotifySong(searchQuery, player);
+                    break;
+                case SongQueryType.SPOTIFYPLAYLIST:
+                    await PlaySpotifyPlaylist(searchQuery, shuffle, player);
+                    break;
+                default:
+                    await PlayYoutubeSong(searchQuery, player);
+                    break;
             }
         }
 
-        if (searchQuery.Contains("open.spotify.com/playlist/"))
+        private async Task PlayYoutubeSong(string searchQuery, VoteLavalinkPlayer player)
+        {
+            var lavaTrack = _audioService.GetTrackAsync(searchQuery, SearchMode.YouTube).Result;
+            if (lavaTrack != null)
+            {
+                await player.PlayAsync(lavaTrack);
+                await RespondAsync($"🔈 Added {lavaTrack.Title} to the queue");
+            }
+            else
+            {
+                await FollowupAsync($"I wasn't able to find anything for `{searchQuery}`.");
+            }
+        }
+
+        private async Task PlayYoutubePlaylist(string searchQuery, bool shuffle, VoteLavalinkPlayer player)
+        {
+            var lavaTracks = _audioService.GetTracksAsync(searchQuery, SearchMode.YouTube).Result;
+            if (shuffle) lavaTracks = Toolbox.Shuffle(lavaTracks.ToList());
+            foreach (var track in lavaTracks)
+            {
+                await player.PlayAsync(track, enqueue: true);
+            }
+
+            await RespondAsync($"🔈 Added {lavaTracks.Count()} tracks to the queue: ");
+        }
+
+        private async Task PlaySpotifySong(string searchQuery, VoteLavalinkPlayer player)
+        {
+            var response = _syrenSpotifyClient.GetTrack(searchQuery);
+            if (response == null)
+            {
+                await FollowupAsync($"Could not find the track {searchQuery}");
+            }
+
+            var lavaTrack = _audioService.GetTrackAsync(response, SearchMode.YouTube).Result;
+            if (lavaTrack != null)
+            {
+                await player.PlayAsync(lavaTrack);
+                await RespondAsync($"🔈 Added {lavaTrack.Title} to the queue");
+            }
+            else
+            {
+                await FollowupAsync($"I wasn't able to find anything for `{searchQuery}`.");
+            }
+        }
+
+        private async Task PlaySpotifyPlaylist(string searchQuery, bool shuffle, VoteLavalinkPlayer player)
         {
             var response = _syrenSpotifyClient.GetPlaylist(searchQuery);
             if (response.Count == 0)
             {
                 await FollowupAsync($"No tracks found for {searchQuery}");
+                return;
             }
-            
+
             if (shuffle)
             {
                 response = Toolbox.Shuffle(response) as List<string>;
             }
-            
+
             foreach (var track in response)
             {
-                await PlayTrackAsync(track, false, false);
-            } 
+                var lavaTrack = _audioService.GetTrackAsync(track, SearchMode.YouTube).Result;
+                if (lavaTrack != null)
+                    await player.PlayAsync(lavaTrack);
+            }
+
             await FollowupAsync($"Enqueued {response.Count} songs.");
         }
 
-        else if (searchQuery.Contains("open.spotify.com/track/"))
+        private static SongQueryType GetQueryType(string searchQuery)
         {
-            var response = _syrenSpotifyClient.GetTrack(searchQuery);
-            if(response == null)
+            if (searchQuery.Contains("open.spotify.com/track/")) return SongQueryType.SPOTIFYSONG;
+            if (searchQuery.Contains("youtube") & searchQuery.Contains("playlist?")) return SongQueryType.YOUTUBEPLAYLIST;
+            if (searchQuery.Contains("youtube")) return SongQueryType.YOUTUBESONG;
+            if (searchQuery.Contains("open.spotify.com/playlist/")) return SongQueryType.SPOTIFYPLAYLIST;
+            return default;
+        }
+
+        private async ValueTask<VoteLavalinkPlayer> GetPlayerAsync(bool connectToVoiceChannel = true)
+        {
+            var player = _audioService.GetPlayer<VoteLavalinkPlayer>(Context.Guild.Id);
+
+            if (player != null
+                && player.State != PlayerState.NotConnected
+                && player.State != PlayerState.Destroyed)
             {
-                await FollowupAsync($"Could not find the track {searchQuery}");
+                return player;
             }
-            await PlayTrackAsync(response, true, false);
-        }
-        else
-        {
-            await PlayTrackAsync(searchQuery, true, shuffle);
-        }
-    }
 
-    private async Task PlayTrackAsync(string searchQuery, bool shouldOutput, bool shuffle)
-    {
-        var searchResponse = await _lavaNode.SearchAsync(searchQuery.StartsWith("https") ? SearchType.Direct : SearchType.YouTube, searchQuery);
-        
-        if (searchResponse.Status is SearchStatus.LoadFailed or SearchStatus.NoMatches) {
-            await FollowupAsync($"I wasn't able to find anything for `{searchQuery}`.");
-            return;
-        }
-        LavaPlayer<LavaTrack>? player = null;
-        var getPlayer = _lavaNode.TryGetPlayer(Context.Guild, out player);
-        if(!getPlayer)
-        {
-            await FollowupAsync("No LavaPlayer found.");
-            return;
-        }
-        if (!string.IsNullOrWhiteSpace(searchResponse.Playlist.Name)) {
-            if (shuffle)
+            var user = Context.Guild.GetUser(Context.User.Id);
+
+            if (!user.VoiceState.HasValue)
             {
-                var tracks = searchResponse.Tracks.ToList();
-                tracks = Toolbox.Shuffle(tracks);
-                player.Vueue.Enqueue(tracks);
+                await RespondAsync("You must be in a voice channel!");
+                return null;
             }
-            else
+
+            if (!connectToVoiceChannel)
             {
-                player.Vueue.Enqueue(searchResponse.Tracks);
-
-
-            }
-            if(shouldOutput)
-                await FollowupAsync($"Enqueued {searchResponse.Tracks.Count} songs.");
-        }
-        else {
-            var track = searchResponse.Tracks.FirstOrDefault();
-            player.Vueue.Enqueue(track);
-            if(shouldOutput)
-                await FollowupAsync($"Enqueued {track?.Title}");
-        }
-
-        if (player.PlayerState is PlayerState.Playing or PlayerState.Paused) {
-            return;
-        }
-
-        player.Vueue.TryDequeue(out var lavaTrack);
-        await player.PlayAsync(lavaTrack);
-    }
-    
-    [SlashCommand("remove", "Removes a song at a queue position, Use /playlist for the queue id"), Alias("dq", "dequeue")]
-    public async Task RemoveAsync([Remainder] string removeQuery)
-    {
-        await DeferAsync();
-        if (!_lavaNode.TryGetPlayer(Context.Guild, out var player)) {
-            await FollowupAsync("I'm not connected to a voice channel.");
-            return;
-        }
-
-        if (player.Vueue.Count == 0) {
-            await FollowupAsync("Nothing in the queue to remove.");
-            return;
-        }
-        
-        var isNumeric = int.TryParse(removeQuery, out var index);
-        if (!isNumeric)
-        {
-            await FollowupAsync($"{removeQuery} is not a number.");
-            return;
-        }
-        
-        if (index - 1 < 0 || index - 1 > player.Vueue.Count)
-        {
-            await FollowupAsync($"Can't remove the track at index {removeQuery}");
-            return;
-        }
-        
-        var track = player.Vueue.RemoveAt(index - 1);
-        await FollowupAsync($"Removed {track.Title}");
-    }
-
-    [SlashCommand("stop", "Stop the track that is currently playing")]
-    public async Task StopAsync()
-    {
-        await DeferAsync();
-        if (!_lavaNode.TryGetPlayer(Context.Guild, out var player)) {
-            await FollowupAsync("I'm not connected to a voice channel.");
-            return;
-        }
-        
-        await FollowupAsync("Stopping.");
-        await player.StopAsync();
-        player.Vueue.Clear();
-    }
-
-    [SlashCommand("skip", "Skips the currently playing song")]
-    public async Task SkipAsync()
-    {
-        await DeferAsync();
-        if (!_lavaNode.TryGetPlayer(Context.Guild, out var player)) {
-            await FollowupAsync("I'm not connected to a voice channel.");
-            return;
-        }
-
-        if (player.PlayerState != PlayerState.Playing) {
-            await FollowupAsync("I can't skip when nothing is playing.");
-            return;
-        }
-
-        try {
-            var (oldTrack, _) = await player.SkipAsync();
-            await FollowupAsync($"Skipped: {oldTrack.Title}\nNow Playing: {player.Track.Title}");
-        }
-        catch (Exception exception) {
-            await FollowupAsync(exception.Message);
-        }
-    }
-    
-    [SlashCommand("nowplaying", "Displayes the currently running song"), Alias("np")]
-    public async Task NowPlayingAsync()
-    {
-        await DeferAsync();
-        if (!_lavaNode.TryGetPlayer(Context.Guild, out var player)) {
-            await FollowupAsync("I'm not connected to a voice channel.");
-            return;
-        }
-
-        if (player.PlayerState != PlayerState.Playing) {
-            await FollowupAsync("I'm not playing any tracks.");
-            return;
-        }
-
-        var track = player.Track;
-        var artwork = await track.FetchArtworkAsync();
-
-        var embed = new EmbedBuilder()
-            .WithAuthor(track.Author, Context.Client.CurrentUser.GetAvatarUrl(), track.Url)
-            .WithTitle($"Now Playing: {track.Title}")
-            .WithImageUrl(artwork)
-            .WithFooter($"{track.Position}/{track.Duration}");
-        
-        await FollowupAsync(embed: embed.Build());
-    }
-    
-    [SlashCommand("genius", "Displays the lyrics for the currently playing song"), Alias("lyrics")]
-    public async Task ShowGeniusLyrics()
-    {
-        await DeferAsync();
-        if (!_lavaNode.TryGetPlayer(Context.Guild, out var player)) {
-            await FollowupAsync("I'm not connected to a voice channel.");
-            return;
-        }
-
-        if (player.PlayerState != PlayerState.Playing) {
-            await FollowupAsync("I'm not playing any tracks.");
-            return;
-        }
-
-        var lyrics = await player.Track.FetchLyricsFromGeniusAsync();
-        if (string.IsNullOrWhiteSpace(lyrics)) {
-            await FollowupAsync($"No lyrics found for {player.Track.Title}");
-            return;
-        }
-
-        await SendLyricsAsync(lyrics);
-    }
-    private async Task SendLyricsAsync(string lyrics) {
-        var splitLyrics = lyrics.Split(Environment.NewLine);
-        var stringBuilder = new StringBuilder();
-        foreach (var line in splitLyrics) {
-            if (line.Contains('[')) {
-                stringBuilder.Append(Environment.NewLine);
+                await RespondAsync("The bot is not in a voice channel!");
+                return null;
             }
 
-            if (stringBuilder.Length > 1000) {
-                await FollowupAsync($"```{stringBuilder}```");
-                stringBuilder.Clear();
-            }
-            else {
-                stringBuilder.AppendLine(line);
-            }
+            return await _audioService.JoinAsync<VoteLavalinkPlayer>(user.Guild.Id, user.VoiceChannel.Id);
         }
-
-        await FollowupAsync($"```{stringBuilder}```");
     }
 }
